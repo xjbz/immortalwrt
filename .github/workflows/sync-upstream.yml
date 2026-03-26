@@ -33,12 +33,19 @@ jobs:
         run: |
           git fetch upstream
 
-      - name: Sync and push all branches
+      - name: Sync and push all branches (safe preserve local commits)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
-          for branch in $(git branch -r | grep 'upstream/' | grep -v 'HEAD' | sed 's|upstream/||'); do
-            git checkout -B "$branch" "upstream/$branch"
+          for branch in $(git branch -r | grep '^upstream/' | grep -v 'HEAD' | sed 's|upstream/||'); do
+            if git show-ref --verify --quiet refs/heads/"$branch"; then
+              git checkout "$branch"
+              git fetch upstream "$branch"
+              # Rebase local commits on top of upstream branch. If conflict occurs, stop for manual resolution.
+              git rebase upstream/"$branch"
+            else
+              git checkout -B "$branch" "upstream/$branch"
+            fi
             git push --force-with-lease origin "$branch"
           done
