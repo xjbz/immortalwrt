@@ -38,5 +38,5 @@ jobs:
           git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}
           for branch in $(git branch -r | grep 'upstream/' | grep -v 'HEAD' | sed 's|upstream/||'); do
             git checkout -B "$branch" "upstream/$branch"
-            git push origin "$branch"
+            git push --force-with-lease origin "$branch"
           done
