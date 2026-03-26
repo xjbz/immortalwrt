@@ -23,6 +23,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+      - name: Add upstream remote
+        run: |
+          git remote add upstream https://github.com/VIKINGYFY/immortalwrt.git
+
       - name: Fetch all branches from upstream
         run: |
           git fetch upstream
