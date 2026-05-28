@@ -61,6 +61,15 @@ ifdef CONFIG_USE_MOLD
   endif
 endif
 
+# loongarch64 sets CONFIG_PAGE_SIZE_16KB, all other targets set CONFIG_PAGE_SIZE_4KB only.
+ifeq ($(ARCH),loongarch64)
+  TARGET_CFLAGS += -Wl,-z,max-page-size=16384
+  TARGET_LDFLAGS += -zmax-page-size=16384
+else
+  TARGET_CFLAGS += -Wl,-z,max-page-size=4096
+  TARGET_LDFLAGS += -zmax-page-size=4096
+endif
+
 include $(INCLUDE_DIR)/hardening.mk
 include $(INCLUDE_DIR)/prereq.mk
 include $(INCLUDE_DIR)/unpack.mk
@@ -150,7 +159,7 @@ ifeq ($(DUMP),)
   ifeq ($(__pkg_provider_path), feeds)
     __pkg_feed_path:=$(word 2,$(subst /, ,$(__pkg_base_path)))
     __pkg_feed_name:=$(patsubst %_root,%,$(__pkg_feed_path))
-    ifneq (__pkg_feed_path, __pkg_feed_name)
+    ifneq ($(__pkg_feed_path), $(__pkg_feed_name))
       __pkg_feed_realpath:=$(realpath $(TOPDIR)/feeds/$(__pkg_feed_name))
       __pkg_feed_dir:=$(patsubst $(TOPDIR)/feeds/$(__pkg_feed_path)/%,%,$(__pkg_feed_realpath))
       __pkg_path:=$(patsubst feeds/$(__pkg_feed_path)/$(__pkg_feed_dir)/%,%,$(__pkg_base_path))

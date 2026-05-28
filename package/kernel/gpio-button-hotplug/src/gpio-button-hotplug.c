@@ -500,28 +500,14 @@ static int gpio_keys_button_probe(struct platform_device *pdev,
 			goto out;
 		}
 
-		if (button->irq) {
-			dev_err(dev, "skipping button %s (only gpio buttons supported)\n",
-				button->desc);
-			bdata->b = &pdata->buttons[i];
-			continue;
-		}
-
 		if (gpio_is_valid(button->gpio)) {
 			/* legacy platform data... but is it the lookup table? */
 			bdata->gpiod = devm_gpiod_get_index(dev, desc, i,
 							    GPIOD_IN);
 			if (IS_ERR(bdata->gpiod)) {
 				/* or the legacy (button->gpio is good) way? */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6,18,0)
-				error = devm_gpio_request_one(dev,
-					button->gpio, GPIOF_IN | (
-					button->active_low ? GPIOF_ACTIVE_LOW :
-					0), desc);
-#else
 				error = devm_gpio_request_one(dev,
 					button->gpio, GPIOF_IN, desc);
-#endif
 				if (error) {
 					dev_err_probe(dev, error,
 						      "unable to claim gpio %d",
@@ -530,10 +516,8 @@ static int gpio_keys_button_probe(struct platform_device *pdev,
 				}
 
 				bdata->gpiod = gpio_to_desc(button->gpio);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6,18,0)
 				if (button->active_low ^ gpiod_is_active_low(bdata->gpiod))
 					gpiod_toggle_active_low(bdata->gpiod);
-#endif
 			}
 		} else {
 			/* Device-tree */
@@ -550,6 +534,13 @@ static int gpio_keys_button_probe(struct platform_device *pdev,
 		if (IS_ERR_OR_NULL(bdata->gpiod)) {
 			error = IS_ERR(bdata->gpiod) ? PTR_ERR(bdata->gpiod) :
 				-EINVAL;
+
+			if (button->irq && error == -ENOENT) {
+				dev_err(dev, "skipping button %s (only gpio buttons supported)\n",
+					button->desc);
+				continue;
+			}
+
 			goto out;
 		}
 
@@ -606,6 +597,9 @@ static int gpio_keys_probe(struct platform_device *pdev)
 		const struct gpio_keys_button *button = &pdata->buttons[i];
 		struct gpio_keys_button_data *bdata = &bdev->data[i];
 		unsigned long irqflags = IRQF_ONESHOT;
+
+		if (!bdata->gpiod)
+			continue;
 
 		INIT_DELAYED_WORK(&bdata->work, gpio_keys_irq_work_func);
 
@@ -671,8 +665,10 @@ static void gpio_keys_irq_close(struct gpio_keys_button_dev *bdev)
 	for (i = 0; i < pdata->nbuttons; i++) {
 		struct gpio_keys_button_data *bdata = &bdev->data[i];
 
-		disable_irq(bdata->irq);
-		cancel_delayed_work_sync(&bdata->work);
+		if (bdata->irq) {
+			disable_irq(bdata->irq);
+			cancel_delayed_work_sync(&bdata->work);
+		}
 	}
 }
 
